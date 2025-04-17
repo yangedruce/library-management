@@ -1,18 +1,21 @@
 <template>
-    <form @submit.prevent="submit" class="mb-6">
-        <input
-            v-model="form.title"
-            type="text"
-            placeholder="Title"
-            class="border p-2 mr-2"
-            required
-        />
-        <input
-            v-model="form.author"
-            type="text"
-            placeholder="Author"
-            class="border p-2 mr-2"
-        />
+    <form @submit.prevent="handleSubmit" class="mb-6">
+        <div class="flex items-center">
+            <div>
+                <input
+                    v-model="form.title"
+                    type="text"
+                    placeholder="Title"
+                    class="border p-2 mr-2"
+                />
+            </div>
+            <input
+                v-model="form.author"
+                type="text"
+                placeholder="Author"
+                class="border p-2 mr-2"
+            />
+        </div>
         <textarea
             v-model="form.description"
             placeholder="Description"
@@ -32,7 +35,7 @@
                 {{ category.name }}
             </label>
         </div>
-        <button class="bg-blue-500 text-white px-4 py-2">
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2">
             {{ editBook ? "Update" : "Add" }}
         </button>
     </form>
@@ -43,7 +46,7 @@ import { ref, watch, reactive } from "vue";
 import axios from "axios";
 
 const props = defineProps(["categories", "editBook"]);
-const emit = defineEmits(["added", "updated", "refresh"]);
+const emit = defineEmits(["submit", "added", "updated", "refresh", "error"]);
 
 const form = reactive({
     title: "",
@@ -62,21 +65,35 @@ watch(
                 description: newVal.description,
                 categories: newVal.categories.map((c) => c.id),
             });
+        } else {
+            resetForm();
         }
     }
 );
 
-const submit = async () => {
-    if (props.editBook) {
-        await axios.put(`/api/books/${props.editBook.id}`, form);
-        emit("updated", true);
-    } else {
-        await axios.post("/api/books", form);
-        emit("added");
+const handleSubmit = async () => {
+    if (!form.title) {
+        emit("error", "Title is required.");
+        return;
     }
 
-    emit("refresh");
+    try {
+        if (props.editBook) {
+            await axios.put(`/api/books/${props.editBook.id}`, form);
+            emit("updated", true);
+        } else {
+            await axios.post("/api/books", form);
+            emit("added");
+        }
+        resetForm();
+        emit("refresh");
+    } catch (error) {
+        console.error("Error in handleSubmit:", error);
+        emit("error", "An error occurred while submitting the form.");
+    }
+};
 
+const resetForm = () => {
     Object.assign(form, {
         title: "",
         author: "",

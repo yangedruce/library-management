@@ -10,12 +10,20 @@
             {{ message }}
         </div>
 
+        <div
+            v-if="errorMessage"
+            class="bg-red-100 text-red-800 p-2 rounded mb-4">
+            {{ errorMessage }}
+        </div>
+
         <BookForm
             @added="handleBookAdded"
             @updated="handleBookUpdated"
             @refresh="fetchBooks"
+            @error="showErrorMessage"
             :categories="categories"
             :editBook="editBook"
+            @submit="handleFormSubmit"
         />
         <input
             v-model="search"
@@ -60,18 +68,27 @@ const selectedCategories = ref([]);
 const search = ref("");
 const editBook = ref(null);
 const message = ref("");
+const errorMessage = ref("");
 
 const fetchBooks = async (msg = null) => {
-    books.value = await axios.get("/api/books").then((res) => res.data);
-    if (msg) {
-        showMessage(msg);
+    try {
+        books.value = await axios.get("/api/books").then((res) => res.data);
+        if (msg) {
+            showMessage(msg);
+        }
+    } catch (error) {
+        console.error("Error fetching books:", error);
+        showErrorMessage("Failed to fetch books.");
     }
 };
 
 const fetchCategories = async () => {
-    categories.value = await axios
-        .get("/api/categories")
-        .then((res) => res.data);
+    try {
+        categories.value = await axios.get("/api/categories").then((res) => res.data);
+    } catch (error) {
+        console.error("Error fetching categories:", error);
+        showErrorMessage("Failed to fetch categories.");
+    }
 };
 
 const filteredBooks = computed(() => {
@@ -95,6 +112,13 @@ const showMessage = (msg) => {
     }, 3000);
 };
 
+const showErrorMessage = (error) => {
+    errorMessage.value = error; 
+    setTimeout(() => {
+        errorMessage.value = ""; 
+    }, 3000);
+};
+
 const handleBookAdded = () => {
     fetchBooks("Book added successfully!");
 };
@@ -105,13 +129,29 @@ const handleBookEdit = (book) => {
 
 const handleBookUpdated = (updated) => {
     if (updated) {
-        fetchBooks("Book updated successfully!");
+        showMessage("Book updated successfully!");
+        fetchBooks();
         editBook.value = null;
     }
 };
 
 const handleBookDeleted = () => {
     fetchBooks("Book deleted successfully!");
+};
+
+const handleFormSubmit = async (form) => {
+    if (!form.title) {
+        showErrorMessage("Title is required.");
+        return;
+    }
+
+    if (editBook.value) {
+        await axios.put(`/api/books/${editBook.value.id}`, form);
+        handleBookUpdated(form);
+    } else {
+        await axios.post("/api/books", form);
+        handleBookAdded(form);
+    }
 };
 
 onMounted(() => {
